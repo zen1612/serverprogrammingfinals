@@ -1,5 +1,3 @@
-// http_client.c
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,11 +35,9 @@ int main(int argc, char *argv[])
     else
         puts("Connected to server...");
 
-    // Send GET request
     sprintf(message, "GET /index.html HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", argv[1]);
     write(sock, message, strlen(message));
 
-    // Receive the response
     while((str_len = read(sock, message, BUF_SIZE)) != 0)
         write(1, message, str_len);
 

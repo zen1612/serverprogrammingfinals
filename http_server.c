@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-#define BUF_SIZE 1024
+#define BUF_SIZE 4096
 
 void error_handling(char *message);
 void handle_get_request(int clnt_sock, char *request);
@@ -40,16 +39,15 @@ int main(int argc, char *argv[])
     if (listen(serv_sock, 5) == -1)
         error_handling("listen() error");
 
+    printf("HTTP server running on port %s...\n", argv[1]);
+
     clnt_adr_sz = sizeof(clnt_adr);
     while(1)
     {
         clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_adr, &clnt_adr_sz);
         if (clnt_sock == -1)
             error_handling("accept() error");
-        else
-            printf("Connected client, client_sock: %d \n", clnt_sock);
 
-        // Read the GET request
         str_len = read(clnt_sock, message, BUF_SIZE);
         if (str_len > 0)
         {
@@ -73,22 +71,45 @@ void error_handling(char *message)
 
 void handle_get_request(int clnt_sock, char *request)
 {
-    if (strncmp(request, "GET /index.html", 15) == 0) {
-        char response[] = 
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html; charset=UTF-8\r\n"
-            "Connection: close\r\n"
-            "Content-Length: 82\r\n\r\n"
-            "<html><body><h1>Welcome to My Web Server!</h1></body></html>";
+    if (strncmp(request, "GET /index.html", 15) == 0 || 
+        strncmp(request, "GET / ", 6) == 0)
+    {
+        FILE *fp = fopen("index.html", "r");
+        if (!fp) {
+            char error[] =
+                "HTTP/1.1 500 Internal Server Error\r\n"
+                "Content-Type: text/plain\r\n"
+                "Content-Length: 21\r\n"
+                "Connection: close\r\n\r\n"
+                "File not found error";
+            write(clnt_sock, error, sizeof(error)-1);
+            return;
+        }
 
-        write(clnt_sock, response, sizeof(response)-1);
-    } else {
+        char body[BUF_SIZE];
+        int body_len = fread(body, 1, sizeof(body), fp);
+        fclose(fp);
+
+        char header[256];
+        sprintf(header,
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: %d\r\n"
+            "Connection: close\r\n\r\n",
+            body_len
+        );
+
+        write(clnt_sock, header, strlen(header));
+        write(clnt_sock, body, body_len);
+    }
+    else
+    {
         char response[] = 
             "HTTP/1.1 404 Not Found\r\n"
-            "Content-Type: text/html; charset=UTF-8\r\n"
+            "Content-Type: text/html\r\n"
             "Connection: close\r\n"
             "Content-Length: 95\r\n\r\n"
-            "<html><body><h1>404 Not Found</h1></body></html>";
+            "<html><body><h1>404 Not Found</h1><p>The requested page does not exist.</p></body></html>";
 
         write(clnt_sock, response, sizeof(response)-1);
     }
